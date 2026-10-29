@@ -37,6 +37,36 @@ function ConditionBuilder(props: {
   const [val, setVal] = useState("");
   const [cur, setCur] = useState("");
   const [hedged, setHedged] = useState(false);
+  const [busy, setBusy] = useState<"" | "extract" | "media">("");
+  const [autoError, setAutoError] = useState("");
+
+  async function autoExtract() {
+    if (!raw.trim() || busy) return;
+    setBusy("extract");
+    setAutoError("");
+    try {
+      const got = await api.extract(raw);
+      setConds([...conds, ...got]);
+    } catch (e) {
+      setAutoError(e instanceof Error ? e.message : "Не извлеклось");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function fromFile(f: File | undefined, kind: "photo" | "audio") {
+    if (!f || busy) return;
+    setBusy("media");
+    setAutoError("");
+    try {
+      const text = kind === "photo" ? await api.ocr(f) : await api.transcribe(f);
+      setRaw(text);
+    } catch (e) {
+      setAutoError(e instanceof Error ? e.message : "Не распозналось");
+    } finally {
+      setBusy("");
+    }
+  }
 
   function add() {
     if (!raw.trim()) return;
@@ -67,6 +97,39 @@ function ConditionBuilder(props: {
         className="w-full rounded-xl border p-3 text-base"
         placeholder={rawPlaceholder}
       />
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-xl bg-gray-100 text-sm font-semibold">
+          📷 Фото
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            aria-label="Загрузить фото текста"
+            disabled={busy !== ""}
+            onChange={(e) => { fromFile(e.target.files?.[0], "photo"); e.target.value = ""; }}
+          />
+        </label>
+        <label className="flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-xl bg-gray-100 text-sm font-semibold">
+          🎤 Аудио
+          <input
+            type="file"
+            accept="audio/*"
+            className="hidden"
+            aria-label="Загрузить аудио"
+            disabled={busy !== ""}
+            onChange={(e) => { fromFile(e.target.files?.[0], "audio"); e.target.value = ""; }}
+          />
+        </label>
+      </div>
+      {busy === "media" && <p className="text-sm text-gray-500">Распознаю… текст подставится ниже, проверьте его.</p>}
+      <Btn onClick={autoExtract} disabled={!raw.trim() || busy !== ""} className="bg-gray-800 text-white">
+        {busy === "extract" ? "Извлекаю…" : "✨ Извлечь условия автоматически"}
+      </Btn>
+      {autoError !== "" && (
+        <p className="rounded-xl bg-red-50 p-3 text-sm text-red-800">
+          Автоматически не получилось ({autoError}). Введите условия вручную ниже — текст сохранён.
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1 text-sm">
           Условие

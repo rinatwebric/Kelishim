@@ -42,8 +42,35 @@ async function req(path: string, init?: RequestInit, timeoutMs = 30000) {
   }
 }
 
+async function upload(path: string, file: Blob, field: string, timeoutMs = 120000) {
+  const form = new FormData();
+  form.append(field, file);
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(BASE + path, { method: "POST", body: form, signal: ctrl.signal });
+    if (!r.ok) {
+      const text = await r.text();
+      throw new Error(`API ${r.status}: ${text}`);
+    }
+    return (await r.json()).text as string;
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new Error("Сервер не отвечает (таймаут). Введите текст вручную.");
+    }
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 export const api = {
   createDeal: (): Promise<{ id: string }> => req("/deals", { method: "POST" }),
+  extract: (raw_text: string): Promise<Condition[]> =>
+    req("/extract", { method: "POST", body: JSON.stringify({ raw_text }) }).then(
+      (r) => r.conditions as Condition[]),
+  transcribe: (file: Blob): Promise<string> => upload("/transcribe", file, "audio"),
+  ocr: (file: Blob): Promise<string> => upload("/ocr", file, "image"),
   addSource: (id: string, raw_text: string, conditions: Condition[]) =>
     req(`/deals/${id}/sources`, {
       method: "POST",

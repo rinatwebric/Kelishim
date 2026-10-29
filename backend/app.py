@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from backend.adapters.muse_adapter import ManualInputRequired
+from backend.adapters.muse_adapter import ManualInputRequired, MuseAdapter
 from backend.adapters.meta_transport import get_default_client
 from backend.store import DealStore
 
@@ -85,8 +85,6 @@ def create_app(store: DealStore | None = None, extract_client="default") -> Fast
 
     @app.post("/extract")
     def post_extract(body: RawTextIn):
-        from backend.adapters.muse_adapter import MuseAdapter
-
         client = app.state.extract_client
         if client == "default":
             client = get_default_client()
@@ -105,6 +103,37 @@ def create_app(store: DealStore | None = None, extract_client="default") -> Fast
              "quote": c.quote, "confidence": c.confidence, "hedged": c.hedged,
              "needs_manual_check": c.needs_manual_check}
             for c in conds]}
+
+    def _media_client():
+        client = app.state.extract_client
+        if client == "default":
+            client = get_default_client()
+        if client is None:
+            raise HTTPException(
+                503,
+                "Распознавание недоступно: нет MODEL_API_KEY. Введите текст вручную.",
+            )
+        return client if isinstance(client, MuseAdapter) else MuseAdapter(client=client)
+
+    @app.post("/transcribe")
+    async def post_transcribe(audio: UploadFile = File(...)):
+        data = await audio.read()
+        if len(data) > 32 * 1024 * 1024:
+            raise HTTPException(413, "Аудио больше 32 МБ — обрежьте или введите текст вручную.")
+        try:
+            return {"text": _media_client().transcribe(data)}
+        except ManualInputRequired as e:
+            raise HTTPException(503, str(e))
+
+    @app.post("/ocr")
+    async def post_ocr(image: UploadFile = File(...)):
+        data = await image.read()
+        if len(data) > 32 * 1024 * 1024:
+            raise HTTPException(413, "Фото больше 32 МБ — сожмите или введите текст вручную.")
+        try:
+            return {"text": _media_client().ocr(data)}
+        except ManualInputRequired as e:
+            raise HTTPException(503, str(e))
 
     return app
 

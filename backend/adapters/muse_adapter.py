@@ -12,7 +12,8 @@ BASE_EXTRACT_PROMPT = (
     "{\"term\": <один из 10>, \"value\": <значение|null>, \"currency\": <KGS|USD|null>, "
     "\"quote\": <точная цитата|null>, \"confidence\": <0..1>, \"hedged\": <bool>}]}. "
     "Термы: " + ", ".join(TERMS) + ". "
-    "Отсутствует — value null. Цитата обязана дословно быть в исходнике."
+    "Отсутствует — value null. Цитата обязана дословно быть в исходнике. "
+    "Для pets value только из: \"yes\", \"no\", \"negotiable\" или null."
 )
 STRICT_SUFFIX = (
     " Ответь строже / strict: только валидный JSON, без прозы. "
@@ -71,10 +72,17 @@ class MuseAdapter:
             conf = item.get("confidence", 1.0)
             if not isinstance(conf, (int, float)) or not 0.0 <= float(conf) <= 1.0:
                 raise ValueError(f"bad confidence for {term}: {conf}")
+            value = item.get("value")
+            if term == "pets":
+                # Живая модель иногда возвращает bool — приводим кодом, мусор отклоняем.
+                if isinstance(value, bool):
+                    value = "yes" if value else "no"
+                elif value is not None and value not in ("yes", "no", "negotiable"):
+                    raise ValueError(f"bad pets value: {value!r}")
             out.append(
                 ExtractedCondition(
                     term=term,
-                    value=item.get("value"),
+                    value=value,
                     currency=item.get("currency"),
                     quote=item.get("quote"),
                     confidence=float(conf),

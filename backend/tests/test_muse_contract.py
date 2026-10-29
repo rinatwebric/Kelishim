@@ -70,6 +70,24 @@ def test_extract_rejects_quote_not_in_source():
         adapter.extract("аренда 30000 сом")
 
 
+def test_extract_coerces_bool_pets_to_yes_no():
+    payload = {"conditions": [
+        {"term": "pets", "value": True, "currency": None,
+         "quote": "можно с котом", "confidence": 0.9, "hedged": False},
+        {"term": "rent_amount", "value": 30000, "currency": "KGS",
+         "quote": "аренда 30000 сом", "confidence": 0.9, "hedged": False},
+    ]}
+    out = MuseAdapter(client=FakeClient([payload])).extract("аренда 30000 сом, можно с котом")
+    assert {c.term: c for c in out}["pets"].value == "yes"
+
+
+def test_extract_rejects_pets_garbage_value():
+    bad = {"conditions": [{"term": "pets", "value": 12345, "currency": None,
+                           "quote": "можно с котом", "confidence": 0.9, "hedged": False}]}
+    with pytest.raises(ManualInputRequired):
+        MuseAdapter(client=FakeClient([bad, bad])).extract("можно с котом")
+
+
 def test_extract_rejects_bad_confidence():
     bad = {"conditions": [{"term": "rent_amount", "value": 30000, "currency": "KGS",
                            "quote": "аренда 30000 сом", "confidence": 1.5, "hedged": False}]}

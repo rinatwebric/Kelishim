@@ -28,6 +28,12 @@ import os
 import httpx
 from pydantic import BaseModel
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 BASE_URL = os.environ.get("MODEL_BASE_URL", "https://api.meta.ai/v1")
 EXTRACT_MODEL = os.environ.get("EXTRACT_MODEL", "muse-spark-1.3")
 ASR_MODEL = "muse-voice-transcribe-1.0"

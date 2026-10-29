@@ -107,5 +107,11 @@ def test_owner_message_requires_manual_confirm_flag():
     assert "Какой залог?" in msg["text"]
 
 
-def test_real_api_skipped_without_docs():
-    pytest.skip("нет подтверждённой доки хакатона/endpoint — реальный вызов запрещён, см. docs/muse-contract.md")
+def test_real_api_live_only_with_key():
+    import os
+    if not os.environ.get("MODEL_API_KEY"):
+        pytest.skip("нет MODEL_API_KEY — живой вызов запрещён, см. docs/muse-contract.md")
+    from backend.adapters.meta_transport import MetaClient
+    client = MetaClient(api_key=os.environ["MODEL_API_KEY"])
+    out = client.complete(prompt="Верни {}", source_text="аренда 30000 сом", timeout=30)
+    assert "conditions" in out

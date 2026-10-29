@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from backend.adapters.muse_adapter import ManualInputRequired
 from backend.store import DealStore
 
 FRONTEND_ORIGINS = [
@@ -29,7 +30,11 @@ class SourceIn(BaseModel):
     conditions: list[ConditionIn] = []
 
 
-def create_app(store: DealStore | None = None) -> FastAPI:
+class RawTextIn(BaseModel):
+    raw_text: str
+
+
+def create_app(store: DealStore | None = None, extract_client=None) -> FastAPI:
     app = FastAPI(title="Kelishim")
     app.add_middleware(
         CORSMiddleware,
@@ -38,6 +43,7 @@ def create_app(store: DealStore | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     app.state.store = store or DealStore()
+    app.state.extract_client = extract_client
 
     @app.post("/deals")
     def post_deal():
@@ -75,6 +81,27 @@ def create_app(store: DealStore | None = None) -> FastAPI:
             return {"ok": True}
         except KeyError:
             raise HTTPException(404, "deal not found")
+
+    @app.post("/extract")
+    def post_extract(body: RawTextIn):
+        from backend.adapters.muse_adapter import MuseAdapter
+
+        client = app.state.extract_client
+        if client is None:
+            raise HTTPException(
+                503,
+                "Извлечение недоступно: нет MODEL_API_KEY. Введите условия вручную — исходник сохранён.",
+            )
+        adapter = client if isinstance(client, MuseAdapter) else MuseAdapter(client=client)
+        try:
+            conds = adapter.extract(body.raw_text)
+        except ManualInputRequired as e:
+            raise HTTPException(503, str(e))
+        return {"conditions": [
+            {"term": c.term, "value": c.value, "currency": c.currency,
+             "quote": c.quote, "confidence": c.confidence, "hedged": c.hedged,
+             "needs_manual_check": c.needs_manual_check}
+            for c in conds]}
 
     return app
 

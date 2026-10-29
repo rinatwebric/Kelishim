@@ -1,18 +1,38 @@
-# Muse contract (Task 2)
+# Meta Model API — подтверждённый контракт (проверено 2026-10-29, интернет)
 
-> Реальных endpoint в доке хакатона на 2026-10-29 не подтверждено. Имена ниже — интерфейс адаптера, не внешний API. Выдумывать URL/схему запрещено.
+- Обзор/base/auth: https://dev.meta.ai/docs/overview
+  `https://api.meta.ai/v1`, Bearer `MODEL_API_KEY` (ключи `LLM_...`),
+  модели `muse-spark-1.3` (дефолт), `muse-spark-1.2/1.1`, `muse-wonder-1.0`.
+- Structured output: https://dev.meta.ai/docs/structured-output
+  Chat Completions `response_format: {type: json_schema, json_schema: {...}}`,
+  декодинг ограничен схемой; ответ — JSON-строка в `choices[0].message.content`.
+- Auth: https://dev.meta.ai/docs/authentication — ключ только сервером
+  (env `MODEL_API_KEY`), никогда во frontend, не в git.
+- ASR: https://dev.meta.ai/docs/speech-to-text
+  `POST https://api.meta.ai/v1/asr/transcribe`, multipart `request` JSON +
+  `audio` WAV mono 16-bit 16/24 kHz, модель `muse-voice-transcribe-1.0`;
+  лимиты 32 MB / 10 мин; 429 → backoff; 500 → 1 retry.
+  Realtime `wss://api.meta.ai/v1/asr/realtime` для прототипа не используем.
+- OCR: image understanding через chat completions `image_url` (data URL) +
+  structured output из изображений (там же, structured-output).
 
-## Интерфейс `MuseAdapter(client, timeout=30)`
+## Как подключено
 
-- `client.complete(*, prompt, source_text, timeout) -> dict` — транспорт модели (инжектится). Таймаут 30с обязателен каждый вызов.
-- `extract(source_text) -> list[ExtractedCondition]` — max 1 retry со строгим промптом; валидация: JSON `{conditions:[...]}`, терм из 10, `quote ⊆ raw_text` при `value≠null`, `confidence∈[0,1]`; итоговая ошибка → `ManualInputRequired` (ручной ввод, не фейк).
-- `transcribe(audio) / ocr(image)` — при отсутствии метода у клиента → `ManualInputRequired`.
-- `draft_questions(registry)` — чистый код: только `conflict/unknown`.
-- `draft_owner_message(qs)` — шаблон + `needs_manual_confirm=True`; отправки нет.
-- `translate_kg(text)` — бонус; при неуверенности остаётся русская версия.
+- `backend/adapters/meta_transport.py` — `MetaClient` (httpx):
+  `complete()` → `/chat/completions` с `json_schema` на 10 термов (enum),
+  `transcribe()` → `/asr/transcribe` multipart,
+  `ocr()` → `/chat/completions` с `image_url`.
+- `POST /extract` — прогоняет `raw_text` через `MuseAdapter.extract`
+  (валидация quote/confidence + retry×1 + timeout 30с сохранены).
+  Без `MODEL_API_KEY`: **503 + текст про ручной ввод**, никакого фейка.
+- Живой тест: `test_real_api_live_only_with_key` — запускается только
+  при наличии `MODEL_API_KEY` в env, иначе SKIP.
 
-## Реальный API
+## Запуск с ключом
 
-- Статус: **не подтверждён** → `test_real_api_skipped_without_docs` = SKIP.
-- После получения доки: дописать сюда имена моделей, лимиты аудио/фото, формат image input, structured JSON — отдельным коммитом + снять SKIP точечным тестом.
-- Demo до тех пор: только «сохранённый результат» с явной меткой.
+```bash
+export MODEL_API_KEY="LLM_..."
+uvicorn backend.app:app --port 8000
+curl -X POST localhost:8000/extract -H 'Content-Type: application/json' \
+  -d '{"raw_text":"аренда 30000 сом, залог 30000"}'
+```

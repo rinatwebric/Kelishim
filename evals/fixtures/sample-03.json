@@ -1,0 +1,1 @@
+{"expected": {"pets": "single", "rent_amount": "match"}, "id": "sample-03-hedged-manual", "note": "Хедж во втором источнике: pets только single + ручная проверка", "terms": {"pets": {"hedged": [true], "values": ["yes"]}, "rent_amount": {"hedged": [false, false], "values": [[30000, null], [30000, "KGS"]]}}}

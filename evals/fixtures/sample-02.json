@@ -1,0 +1,1 @@
+{"expected": {"pets": "unknown", "rent_amount": "single", "term": "single"}, "id": "sample-02-single-unknown", "note": "Один источник: животные не упомянуты", "terms": {"pets": {"hedged": [], "values": []}, "rent_amount": {"hedged": [false], "values": [[25000, "KGS"]]}, "term": {"hedged": [false], "values": [6]}}}

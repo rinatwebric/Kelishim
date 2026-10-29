@@ -1,0 +1,1 @@
+{"expected": {"deposit": "conflict", "rent_amount": "match"}, "id": "sample-01-zalog-conflict", "note": "Два источника: аренда совпала, залог различается", "terms": {"deposit": {"hedged": [false, false], "values": [[30000, "KGS"], [35000, "KGS"]]}, "rent_amount": {"hedged": [false, false], "values": [[30000, "KGS"], [30000, null]]}}}

@@ -65,6 +65,18 @@ def test_deal_survives_restart_and_deletes(tmp_path):
     assert c2.get(f"/deals/{did}/registry").status_code == 404
 
 
+def test_nonstring_pets_value_does_not_crash_registry(tmp_path):
+    # Живая модель вернула pets=True (bool). Реестр обязан пережить это.
+    c = _client(tmp_path)
+    did = c.post("/deals").json()["id"]
+    r = c.post(f"/deals/{did}/sources", json={"kind": "text", "raw_text": "можно с котом",
+        "conditions": [{"term": "pets", "value": True, "quote": "можно с котом", "confidence": 0.9}]})
+    assert r.status_code == 200, r.text
+    reg = c.get(f"/deals/{did}/registry").json()
+    row = next(x for x in reg["rows"] if x["term"] == "pets")
+    assert row["status"] in ("single", "match")
+
+
 def test_lowercase_currency_matches(tmp_path):
     c = _client(tmp_path)
     did = c.post("/deals").json()["id"]

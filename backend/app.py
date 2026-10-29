@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from backend.adapters.muse_adapter import ManualInputRequired
+from backend.adapters.meta_transport import get_default_client
 from backend.store import DealStore
 
 FRONTEND_ORIGINS = [
@@ -34,7 +35,7 @@ class RawTextIn(BaseModel):
     raw_text: str
 
 
-def create_app(store: DealStore | None = None, extract_client=None) -> FastAPI:
+def create_app(store: DealStore | None = None, extract_client="default") -> FastAPI:
     app = FastAPI(title="Kelishim")
     app.add_middleware(
         CORSMiddleware,
@@ -87,6 +88,8 @@ def create_app(store: DealStore | None = None, extract_client=None) -> FastAPI:
         from backend.adapters.muse_adapter import MuseAdapter
 
         client = app.state.extract_client
+        if client == "default":
+            client = get_default_client()
         if client is None:
             raise HTTPException(
                 503,

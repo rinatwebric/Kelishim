@@ -135,6 +135,11 @@ class MetaClient:
 
 
 def get_default_client() -> MetaClient | None:
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
     key = os.environ.get("MODEL_API_KEY")
     if not key:
         return None

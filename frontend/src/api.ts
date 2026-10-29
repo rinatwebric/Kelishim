@@ -18,16 +18,28 @@ export type Row = {
   needs_manual_check: boolean;
 };
 
-async function req(path: string, init?: RequestInit) {
-  const r = await fetch(BASE + path, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-  });
-  if (!r.ok) {
-    const t = await r.text();
-    throw new Error(`API ${r.status}: ${t}`);
+async function req(path: string, init?: RequestInit, timeoutMs = 30000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(BASE + path, {
+      ...init,
+      signal: ctrl.signal,
+      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    });
+    if (!r.ok) {
+      const text = await r.text();
+      throw new Error(`API ${r.status}: ${text}`);
+    }
+    return r.json();
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new Error("Сервер не отвечает (таймаут). Проверьте backend и введите условия вручную.");
+    }
+    throw e;
+  } finally {
+    clearTimeout(t);
   }
-  return r.json();
 }
 
 export const api = {
@@ -44,6 +56,8 @@ export const api = {
     }),
   registry: (id: string): Promise<{ id: string; rows: Row[] }> =>
     req(`/deals/${id}/registry`),
+  deleteDeal: (id: string): Promise<{ ok: boolean }> =>
+    req(`/deals/${id}`, { method: "DELETE" }),
 };
 
 export const TERMS = [
@@ -51,9 +65,22 @@ export const TERMS = [
   "prepayment", "repairs", "owner_access", "termination", "deposit_return",
 ];
 
+export const TERM_RU: Record<string, string> = {
+  rent_amount: "Аренда",
+  deposit: "Залог",
+  term: "Срок",
+  utilities: "Коммуналка",
+  pets: "Животные",
+  prepayment: "Предоплата",
+  repairs: "Ремонт",
+  owner_access: "Доступ хозяина",
+  termination: "Расторжение",
+  deposit_return: "Возврат залога",
+};
+
 export const STATUS_META: Record<Row["status"], { icon: string; word: string; cls: string }> = {
   unknown: { icon: "❓", word: "Не указано", cls: "bg-gray-100 text-gray-800" },
-  single: { icon: "🟡", word: "Один источник", cls: "bg-yellow-100 text-yellow-900" },
-  match: { icon: "✅", word: "Совпадает", cls: "bg-green-100 text-green-900" },
-  conflict: { icon: "⚠️", word: "Противоречие", cls: "bg-red-100 text-red-900" },
+  single: { icon: "🟡", word: "Один источник", cls: "bg-yellow-100 text-yellow-800" },
+  match: { icon: "✅", word: "Совпадает", cls: "bg-green-100 text-green-800" },
+  conflict: { icon: "⚠️", word: "Противоречие", cls: "bg-red-100 text-red-800" },
 };

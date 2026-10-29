@@ -29,6 +29,11 @@ class ExtractedCondition:
     def __post_init__(self):
         if self.term not in TERMS:
             raise ValueError(f"unknown term: {self.term}")
+        if self.currency is not None:
+            cur = str(self.currency).strip().upper()
+            if cur not in ("KGS", "USD"):
+                raise ValueError(f"bad currency for {self.term}: {self.currency!r} (KGS|USD|null)")
+            self.currency = cur
         if not 0.0 <= self.confidence <= 1.0:
             raise ValueError("confidence must be in [0,1]")
         if self.value is None:

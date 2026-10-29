@@ -27,8 +27,8 @@ def _comparable(term: str, value, currency):
 
 
 class DealStore:
-    def __init__(self, path: str = "backend/data/deals.json"):
-        self.path = path
+    def __init__(self, path: str | None = None):
+        self.path = path or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "deals.json")
         self._deals: dict = {}
         self._load()
 
@@ -37,7 +37,14 @@ class DealStore:
             try:
                 with open(self.path, encoding="utf-8") as f:
                     self._deals = json.load(f).get("deals", {})
-            except (json.JSONDecodeError, OSError):
+            except OSError:
+                self._deals = {}
+            except json.JSONDecodeError:
+                backup = self.path + ".corrupt"
+                try:
+                    os.replace(self.path, backup)
+                except OSError:
+                    pass
                 self._deals = {}
 
     def _save(self):

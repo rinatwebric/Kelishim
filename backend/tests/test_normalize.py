@@ -31,3 +31,10 @@ def test_pets():
     assert normalize_pets("без животных") == "no"
     assert normalize_pets("по договорённости") == "negotiable"
     assert normalize_pets("") == "unknown"
+
+
+def test_pets_no_substring_false_positives():
+    assert normalize_pets("дата заезда 1-го") == "unknown"
+    assert normalize_pets("животные обсуждаются") == "unknown"
+    assert normalize_pets("да, можно с котом") == "yes"
+    assert normalize_pets("нет, без животных") == "no"

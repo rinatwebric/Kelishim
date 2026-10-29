@@ -60,8 +60,31 @@ def test_null_value_ok_without_quote():
     assert c.value is None
 
 
-def test_owner_reply_changes_status():
-    before = compute_status([normalize_amount("30 000 сом"), normalize_amount("35 000 сом")])
-    assert before == "conflict"
-    after = compute_status([normalize_amount("30 000 сом"), normalize_amount("30 тыс")])
-    assert after == "match"
+def test_owner_reply_changes_status(tmp_path=None):
+    # Ответ хозяина, подтверждающий единственный источник: single -> match.
+    # Пересчёт кодом через реальный DealStore, а не подменой списка.
+    import tempfile, os
+    from backend.store import DealStore
+    d = tempfile.mkdtemp()
+    store = DealStore(os.path.join(d, "t.json"))
+    did = store.create_deal()
+    store.add_source(did, "text", "аренда 30000 сом", [
+        {"term": "rent_amount", "value": 30000, "currency": "KGS",
+         "quote": "аренда 30000 сом", "confidence": 0.9, "hedged": False}])
+    before = store.get_registry(did)
+    row_before = next(r for r in before["rows"] if r["term"] == "rent_amount")
+    assert row_before["status"] == "single"
+    store.add_source(did, "owner_reply", "да, аренда 30000 сом", [
+        {"term": "rent_amount", "value": 30000, "currency": "KGS",
+         "quote": "аренда 30000 сом", "confidence": 0.95, "hedged": False}])
+    after = store.get_registry(did)
+    row_after = next(r for r in after["rows"] if r["term"] == "rent_amount")
+    assert row_after["status"] == "match"
+    assert len(row_after["entries"]) == 2
+
+
+def test_currency_case_insensitive():
+    from backend.domain.schema import ExtractedCondition
+    c = ExtractedCondition(term="rent_amount", value=30000, currency="kgs",
+                           quote="аренда 30000", raw_text="аренда 30000")
+    assert c.currency == "KGS"

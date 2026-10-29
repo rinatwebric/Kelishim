@@ -57,6 +57,23 @@ def test_deal_survives_restart_and_deletes(tmp_path):
     # новый инстанс на том же файле = рестарт
     c2 = _client(tmp_path)
     reg = c2.get(f"/deals/{did}/registry").json()
-    assert any(r["term"] == "term" for r in reg["rows"])
+    term_row = next(r for r in reg["rows"] if r["term"] == "term")
+    assert term_row["status"] == "single"
+    assert len(term_row["entries"]) == 1
+    assert term_row["entries"][0]["quote"] == "год"
     assert c2.delete(f"/deals/{did}").status_code == 200
     assert c2.get(f"/deals/{did}/registry").status_code == 404
+
+
+def test_lowercase_currency_matches(tmp_path):
+    c = _client(tmp_path)
+    did = c.post("/deals").json()["id"]
+    c.post(f"/deals/{did}/sources", json={"kind": "text", "raw_text": "аренда 30000 сом",
+        "conditions": [{"term": "rent_amount", "value": 30000, "currency": "kgs",
+                        "quote": "аренда 30000 сом", "confidence": 0.9}]})
+    c.post(f"/deals/{did}/sources", json={"kind": "text", "raw_text": "аренда 30000 KGS",
+        "conditions": [{"term": "rent_amount", "value": 30000, "currency": "KGS",
+                        "quote": "аренда 30000 KGS", "confidence": 0.9}]})
+    reg = c.get(f"/deals/{did}/registry").json()
+    row = next(r for r in reg["rows"] if r["term"] == "rent_amount")
+    assert row["status"] == "match"

@@ -102,13 +102,23 @@ class MuseAdapter:
         fn = getattr(self.client, "transcribe", None)
         if fn is None:
             raise ManualInputRequired("Расшифровка аудио недоступна — введите текст вручную.")
-        return fn(audio=audio, timeout=self.timeout)
+        try:
+            return fn(audio=audio, timeout=self.timeout)
+        except ManualInputRequired:
+            raise
+        except Exception as e:
+            raise ManualInputRequired(f"Расшифровка не удалась ({e}) — введите текст вручную.") from e
 
     def ocr(self, image: bytes) -> str:
         fn = getattr(self.client, "ocr", None)
         if fn is None:
             raise ManualInputRequired("Распознавание фото недоступно — введите текст вручную.")
-        return fn(image=image, timeout=self.timeout)
+        try:
+            return fn(image=image, timeout=self.timeout)
+        except ManualInputRequired:
+            raise
+        except Exception as e:
+            raise ManualInputRequired(f"Распознавание не удалось ({e}) — введите текст вручную.") from e
 
     def translate_kg(self, text: str) -> str:
         try:

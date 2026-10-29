@@ -68,8 +68,8 @@ def normalize_pets(raw: str) -> str:
     s = raw.strip().lower()
     if "договор" in s:
         return "negotiable"
-    if any(k in s for k in ("без животн", "нельзя", "запрещ", "no pets")):
+    if any(k in s for k in ("без животн", "нельзя", "запрещ")) or re.search(r"\bнет\b", s):
         return "no"
-    if any(k in s for k in ("можно", "разреш", "да", "с котом", "с собакой", "животные")):
+    if any(k in s for k in ("можно", "разреш", "с котом", "с собакой")) or re.search(r"\bда\b", s):
         return "yes"
     return "unknown"
